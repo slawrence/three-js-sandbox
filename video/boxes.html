@@ -2,7 +2,7 @@
 <html>
 	<head>
 		<meta charset="utf-8">
-		<title>NPVR Three.js Boxes Demo</title>
+		<title>Video</title>
 		<style>
 			html, body {
 				width: 100%;
@@ -14,15 +14,6 @@
 				margin: 0;
 				overflow: hidden;
 				font-family: arial;
-			}
-
-			#help {
-				position: absolute;
-				top: 800px;
-			}
-			#info {
-				position: absolute;
-				top: 820px;
 			}
 
 			canvas {
@@ -39,10 +30,44 @@
 		<script src="../lib/OculusRiftControls.js"></script>
 		<script src="../lib/OculusRiftEffect.js"></script>
 
-    <div id="help">Move this window to your Rift (use the Windows key + arrows to get it there fast) then hit 'f' to make it fullscreen.</div>
-		<div id="info">IPD: <span id='ipd'>0</span> (+o/-p)</div>
+        <video id="monitor" autoplay width="160" height="120" style="visibility: hidden; float:left;"></video>
+        <canvas id="webcamImage" width="160" height="120" style="visibility: hidden; float:left;"></canvas>
+        <div id="errorMessage"></div>
 
 		<script>
+        navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+        window.URL = window.URL || window.webkitURL;
+        camVideo = document.getElementById( 'monitor' );
+
+        if (!navigator.getUserMedia) {
+            document.getElementById('errorMessage').innerHTML = 
+                'Sorry. <code>navigator.getUserMedia()</code>code> is not available.';
+        } else {
+            console.log('here')
+            navigator.getUserMedia({video: true}, gotStream, noStream);
+        }
+
+        function gotStream(stream) 
+        {
+            if (window.URL) 
+            {   camVideo.src = window.URL.createObjectURL(stream);   } 
+            else // Opera
+            {   camVideo.src = stream;   }
+        
+            camVideo.onerror = function(e) 
+            {   stream.stop();   };
+        
+            stream.onended = noStream;
+        }
+
+        function noStream(e) 
+        {
+            var msg = 'No camera available.';
+            if (e.code == 1) 
+            {   msg = 'User denied access to use camera.';   }
+            document.getElementById('errorMessage').textContent = msg;
+        }
+
 		(function() {
 			var camera, scene, renderer;
 			var geometry, material, mesh;
@@ -68,7 +93,6 @@
 					init();
 					animate();
 				} catch (e) {
-					//statusEl.innerText = e.toString();
 					console.log(e);
 				}
 			});
@@ -147,13 +171,30 @@
 				    var movieMaterial = new THREE.MeshBasicMaterial( { map: videoTexture, overdraw: true, side:THREE.DoubleSide } );
 				    // the geometry on which the movie will be displayed;
 				    //         movie image will be scaled to fit these dimensions.
-				    var movieGeometry = new THREE.PlaneGeometry( 240, 100, 4, 4 );
+				    var movieGeometry = new THREE.PlaneGeometry( 240, 400, 4, 4 );
 				    var movieScreen = new THREE.Mesh( movieGeometry, movieMaterial );
 				    movieScreen.position.set(0,50,0);
 				    scene.add(movieScreen);
 
-				    // camera.position.set(0,150,300);
-					// camera.lookAt(movieScreen.position);
+
+                    //create webcam viewer
+                    monitor = document.getElementById('monitor');
+
+                    webcamImage = document.getElementById('webcamImage');
+				    webcamContext = webcamImage.getContext( '2d' );
+				    webcamContext.fillStyle = '#000000';
+				    webcamContext.fillRect( 0, 0, webcamImage.width, webcamImage.height );
+
+				    webcamTexture = new THREE.Texture( webcamImage );
+				    webcamTexture.minFilter = THREE.LinearFilter;
+				    webcamTexture.magFilter = THREE.LinearFilter;
+
+				    var webcamMaterial = new THREE.MeshBasicMaterial( { map: webcamTexture, overdraw: true, side:THREE.DoubleSide } );
+				    var webcamGeometry = new THREE.PlaneGeometry( 240, 100, 4, 4 );
+				    var webcamScreen = new THREE.Mesh( webcamGeometry, webcamMaterial );
+				    webcamScreen.position.set(300,50,0);
+				    scene.add(webcamScreen);
+
 					camera.position.set(0,0,300);
                 })();
 
@@ -166,9 +207,6 @@
 				});
 
 				effect = new THREE.OculusRiftEffect( renderer );
-
-				document.getElementById('ipd').innerHTML =
-						effect.getInterpupillaryDistance().toFixed(3);
 
 				document.body.appendChild( renderer.domElement );
 
@@ -235,6 +273,13 @@
                     videoImageContext.drawImage( video, 0, 0 );
                     if ( videoTexture ) 
                             videoTexture.needsUpdate = true;
+                }
+
+                if ( monitor.readyState === monitor.HAVE_ENOUGH_DATA ) 
+                {
+                    webcamContext.drawImage( monitor, 0, 0, webcamImage.width, webcamImage.height );
+                    if ( webcamTexture ) 
+                        webcamTexture.needsUpdate = true;
                 }
 
 				//renderer.render( scene, camera );
