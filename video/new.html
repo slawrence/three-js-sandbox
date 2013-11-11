@@ -80,17 +80,27 @@
                 }
 
                 try {
-                    init();
-                    animate();
+                    var loader = new THREE.JSONLoader(true);
+                    loader.load("logo.js", function (logo) {
+                        var material = new THREE.MeshBasicMaterial({color: 0x00ff00});
+                        var mesh = new THREE.Mesh(logo, material);
+                        mesh.position.set(0, 200, 0);
+                        mesh.scale.set(100, 100, 100);
+                        mesh.rotation.x = Math.PI/2;
+                        init(mesh);
+                        animate();
+                    });
                 } catch (e) {
                     console.log(e);
                 }
             });
 
-            function init() {
+            function init(logoMesh) {
+                globalLogo = logoMesh;
 
                 camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 1000 );
                 scene = new THREE.Scene();
+                scene.add(logoMesh);
 
                 var light = new THREE.DirectionalLight( 0xffffff, 1.5 );
                 light.position.set( 1, 1, 1 );
@@ -202,19 +212,27 @@
                         } else {
                             vr.exitFullScreen();
                         }
-                        e.preventDefault();
+                        event.preventDefault();
                         break;
 
                     case 32: // space
                         vr.resetHmdOrientation();
-                        e.preventDefault();
+                        event.preventDefault();
                         break;
                 }
             }
 
             var vrstate = new vr.State();
+            var vx = 1;
             function animate() {
                 vr.requestAnimationFrame(animate);
+                var logoX = globalLogo.position.x;
+                if (logoX > 300) {
+                    vx = -1;
+                } else if (logoX < -300) {
+                    vx = 1;
+                }
+                globalLogo.position.x = logoX + vx;
 
                 controls.isOnObject( false );
 
