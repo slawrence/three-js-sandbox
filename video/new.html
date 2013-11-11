@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Video</title>
+        <style>
+            canvas {
+                position: absolute;
+                top: 0;
+                left: 0;
+            }
+        </style>
+    </head>
+    <body>
+        <script src="../lib/vr.js"></script>
+        <script src="../lib/three.old.js"></script>
+        <script src="../lib/OculusRiftControls.js"></script>
+        <script src="../lib/OculusRiftEffect.js"></script>
+
+        <video id="monitor" autoplay width="160" height="120" style="visibility: hidden; float:left;"></video>
+        <canvas id="webcamImage" width="160" height="120" style="visibility: hidden; float:left;"></canvas>
+        <canvas id="videoImage" width="480" height="204" style="visibility: hidden; float:left;"></canvas>
+        <div id="errorMessage"></div>
+
+        <script>
+
+        (function initCamVideo() {
+            navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+            window.URL = window.URL || window.webkitURL;
+            var camVideo = document.getElementById( 'monitor' );
+
+            if (!navigator.getUserMedia) {
+                document.getElementById('errorMessage').innerHTML = 
+                    'Sorry. <code>navigator.getUserMedia()</code> is not available.';
+            } else {
+                navigator.getUserMedia({video: true}, gotStream, noStream);
+            }
+
+            function gotStream(stream) 
+            {
+                if (window.URL) 
+                {   camVideo.src = window.URL.createObjectURL(stream);   } 
+                else // Opera
+                {   camVideo.src = stream;   }
+            
+                camVideo.onerror = function(e) 
+                {   stream.stop();   };
+            
+                stream.onended = noStream;
+            }
+
+            function noStream(e) 
+            {
+                var msg = 'No camera available.';
+                if (e.code == 1) 
+                {   msg = 'User denied access to use camera.';   }
+                document.getElementById('errorMessage').textContent = msg;
+            }
+        }());
+
+        (function() {
+            var camera, scene, renderer;
+            var geometry, material, mesh;
+            var controls, time = Date.now();
+
+            var effect; // rift effect
+
+            var objects = [];
+
+            var ray;
+
+            if (!vr.isInstalled()) {
+                //statusEl.innerText = 'NPVR plugin not installed!';
+                alert('NPVR plugin not installed!');
+            }
+            vr.load(function(error) {
+                if (error) {
+                    //statusEl.innerText = 'Plugin load failed: ' + error.toString();
+                    alert('Plugin load failed: ' + error.toString());
+                }
+
+                try {
+                    var loader = new THREE.JSONLoader(true);
+                    loader.load("logo.js", function (logo) {
+                        var material = new THREE.MeshBasicMaterial({color: 0x00ff00});
+                        var mesh = new THREE.Mesh(logo, material);
+                        mesh.position.set(0, 200, 0);
+                        mesh.scale.set(100, 100, 100);
+                        mesh.rotation.x = Math.PI/2;
+                        init(mesh);
+                        animate();
+                    });
+                } catch (e) {
+                    console.log(e);
+                }
+            });
+
+            function init(logoMesh) {
+                globalLogo = logoMesh;
+
+                camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 1000 );
+                scene = new THREE.Scene();
+                scene.add(logoMesh);
+
+                var light = new THREE.DirectionalLight( 0xffffff, 1.5 );
+                light.position.set( 1, 1, 1 );
+                scene.add(light);
+
+                controls = new THREE.OculusRiftControls(camera);
+                scene.add(controls.getObject());
+
+                ray = new THREE.Raycaster();
+                ray.ray.direction.set( 0, -1, 0 );
+
+                // floor
+                var floorTexture = new THREE.ImageUtils.loadTexture( 'images/checkerboard.jpg' );
+                floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; 
+                floorTexture.repeat.set( 10, 10 );
+                var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+                var floorGeometry = new THREE.PlaneGeometry(1000, 1000, 10, 10);
+                var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+                floor.position.y = -0.5;
+                floor.rotation.x = Math.PI / 2;
+                scene.add(floor);
+
+                (function() {
+                    // SKYBOX/FOG
+                    var skyBoxGeometry = new THREE.CubeGeometry( 10000, 10000, 10000 );
+                    var skyBoxMaterial = new THREE.MeshBasicMaterial( { color: 0x9999ff, side: THREE.BackSide } );
+                    var skyBox = new THREE.Mesh( skyBoxGeometry, skyBoxMaterial );
+                    // scene.add(skyBox);
+                    scene.fog = new THREE.FogExp2( 0x9999ff, 0.00025 );
+
+                    // create the video element
+                    video = document.createElement( 'video' );
+                    video.src = "./sintel.ogv";
+                    video.load(); // must call after setting/changing source
+                    video.play();
+
+                    videoImage = document.getElementById( 'videoImage' );
+                    videoImageContext = videoImage.getContext( '2d' );
+                    // background color if no video present
+                    videoImageContext.fillStyle = '#000000';
+                    videoImageContext.fillRect( 0, 0, videoImage.width, videoImage.height );
+
+                    videoTexture = new THREE.Texture( videoImage );
+                    videoTexture.minFilter = THREE.LinearFilter;
+                    videoTexture.magFilter = THREE.LinearFilter;
+
+                    var movieMaterial = new THREE.MeshBasicMaterial( { map: videoTexture, overdraw: true, side:THREE.DoubleSide } );
+                    // the geometry on which the movie will be displayed;
+                    //         movie image will be scaled to fit these dimensions.
+                    var movieGeometry = new THREE.PlaneGeometry( 240, 100, 4, 4 );
+                    var movieScreen = new THREE.Mesh( movieGeometry, movieMaterial );
+                    movieScreen.position.set(0,50,0);
+                    scene.add(movieScreen);
+
+
+                    //create webcam viewer
+                    monitor = document.getElementById('monitor');
+
+                    webcamImage = document.getElementById('webcamImage');
+                    webcamContext = webcamImage.getContext( '2d' );
+                    webcamContext.fillStyle = '#000000';
+                    webcamContext.fillRect( 0, 0, webcamImage.width, webcamImage.height );
+
+                    webcamTexture = new THREE.Texture( webcamImage );
+                    webcamTexture.minFilter = THREE.LinearFilter;
+                    webcamTexture.magFilter = THREE.LinearFilter;
+
+                    var webcamMaterial = new THREE.MeshBasicMaterial( { map: webcamTexture, overdraw: true, side:THREE.DoubleSide } );
+                    var webcamGeometry = new THREE.PlaneGeometry( 140, 100, 4, 4 );
+                    var webcamScreen = new THREE.Mesh( webcamGeometry, webcamMaterial );
+                    webcamScreen.position.set(300,50,0);
+                    scene.add(webcamScreen);
+
+                    camera.position.set(0,0,300);
+                })();
+
+                renderer = new THREE.WebGLRenderer({
+                    devicePixelRatio: 1,
+                    alpha: false,
+                    clearColor: 0xffffff,
+                    antialias: true
+                });
+
+                effect = new THREE.OculusRiftEffect( renderer );
+
+                document.body.appendChild( renderer.domElement );
+
+                document.addEventListener( 'keydown', keyPressed, false );
+            }
+
+            function keyPressed (event) {
+                switch ( event.keyCode ) {
+                    case 79: // o
+                        effect.setInterpupillaryDistance(
+                                effect.getInterpupillaryDistance() - 0.001);
+                        document.getElementById('ipd').innerHTML =
+                                effect.getInterpupillaryDistance().toFixed(3);
+                        break;
+                    case 80: // p
+                        effect.setInterpupillaryDistance(
+                                effect.getInterpupillaryDistance() + 0.001);
+                        document.getElementById('ipd').innerHTML =
+                                effect.getInterpupillaryDistance().toFixed(3);
+                        break;
+
+                    case 70: // f
+                        if (!vr.isFullScreen()) {
+                            vr.enterFullScreen();
+                        } else {
+                            vr.exitFullScreen();
+                        }
+                        event.preventDefault();
+                        break;
+
+                    case 32: // space
+                        vr.resetHmdOrientation();
+                        event.preventDefault();
+                        break;
+                }
+            }
+
+            var vrstate = new vr.State();
+            var vx = 1;
+            function animate() {
+                vr.requestAnimationFrame(animate);
+                var logoX = globalLogo.position.x;
+                if (logoX > 300) {
+                    vx = -1;
+                } else if (logoX < -300) {
+                    vx = 1;
+                }
+                globalLogo.position.x = logoX + vx;
+
+                controls.isOnObject( false );
+
+                ray.ray.origin.copy( controls.getObject().position );
+                ray.ray.origin.y -= 10;
+
+                var intersections = ray.intersectObjects( objects );
+                if ( intersections.length > 0 ) {
+                    var distance = intersections[ 0 ].distance;
+                    if ( distance > 0 && distance < 10 ) {
+                        controls.isOnObject( true );
+                    }
+                }
+
+                // Poll VR, if it's ready.
+                var polled = vr.pollState(vrstate);
+                controls.update( Date.now() - time, polled ? vrstate : null );
+
+                //update video
+                if ( video.readyState === video.HAVE_ENOUGH_DATA ) 
+                {
+                    videoImageContext.drawImage( video, 0, 0 );
+                    if ( videoTexture ) 
+                            videoTexture.needsUpdate = true;
+                }
+
+                //update webcam video
+                if ( monitor.readyState === monitor.HAVE_ENOUGH_DATA ) 
+                {
+                    webcamContext.drawImage( monitor, 0, 0, webcamImage.width, webcamImage.height );
+                    if ( webcamTexture ) 
+                        webcamTexture.needsUpdate = true;
+                }
+
+                //renderer.render( scene, camera );
+                effect.render( scene, camera, polled ? vrstate : null );
+
+                time = Date.now();
+            }
+        })();
+        </script>
+    </body>
+</html>
