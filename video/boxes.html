@@ -119,7 +119,7 @@
 				    video = document.createElement( 'video' );
 				    // video.id = 'video';
 				    // video.type = ' video/ogg; codecs="theora, vorbis" ';
-				    video.src = "videos/sintel.ogv";
+				    video.src = "./sintel.ogv";
 				    video.load(); // must call after setting/changing source
 				    video.play();
 
@@ -230,6 +230,12 @@
 				// Poll VR, if it's ready.
 				var polled = vr.pollState(vrstate);
 				controls.update( Date.now() - time, polled ? vrstate : null );
+                if ( video.readyState === video.HAVE_ENOUGH_DATA ) 
+                {
+                    videoImageContext.drawImage( video, 0, 0 );
+                    if ( videoTexture ) 
+                            videoTexture.needsUpdate = true;
+                }
 
 				//renderer.render( scene, camera );
 				effect.render( scene, camera, polled ? vrstate : null );
