@@ -83,7 +83,7 @@
                 try {
                     var loader = new THREE.JSONLoader(true);
                     loader.load("logo.js", function (logo) {
-                        var material = new THREE.MeshBasicMaterial({color: 0x00ff00});
+                        var material = new THREE.MeshLambertMaterial({color: 0x00cc00});
                         var mesh = new THREE.Mesh(logo, material);
                         mesh.position.set(0, 200, 0);
                         mesh.scale.set(100, 100, 100);
@@ -100,11 +100,12 @@
                 globalLogo = logoMesh;
 
                 camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 1000 );
+                camera.position.set(0,0,300);
                 scene = new THREE.Scene();
                 scene.add(logoMesh);
 
-                var light = new THREE.DirectionalLight( 0xffffff, 1.5 );
-                light.position.set( 1, 1, 1 );
+                var light = new THREE.PointLight( 0xffffff, 1 );
+                light.position.set( logoMesh.position.x, logoMesh.position.y + 200, logoMesh.position.z + 200 );
                 scene.add(light);
 
                 controls = new THREE.OculusRiftControls(camera);
@@ -176,8 +177,6 @@
                     var webcamScreen = new THREE.Mesh( webcamGeometry, webcamMaterial );
                     webcamScreen.position.set(300,50,0);
                     scene.add(webcamScreen);
-
-                    camera.position.set(0,0,300);
                 })();
 
                 cameraTargetIndicator = (function() {
