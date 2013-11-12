@@ -180,7 +180,8 @@
                 })();
 
                 cameraTargetIndicator = (function() {
-                    var geometry = new THREE.CubeGeometry(5,5,5);
+                    var edge = 0.1;
+                    var geometry = new THREE.CubeGeometry(edge,edge,edge);
                     var material = new THREE.MeshBasicMaterial( { color: 0x0000ff } );
                     var cube = new THREE.Mesh( geometry, material );
                     scene.add(cube);
@@ -235,7 +236,6 @@
             var vrstate = new vr.State();
             var vx = 1;
             function animate() {
-                debugger;
                 vr.requestAnimationFrame(animate);
                 var logoX = globalLogo.position.x;
                 if (logoX > 300) {
@@ -280,14 +280,19 @@
 
                 // update camera target indicator
                 (function() {
-                    var factor = 100;
+                    var factor = 5;
+
                     // src for this calc: http://stackoverflow.com/questions/14813902/three-js-get-the-direction-in-which-the-camera-is-looking
                     var cameraDir = new THREE.Vector3( 0, 0, -1 ).applyQuaternion( camera.quaternion ).normalize();
-                    // var cameraDir = new THREE.Vector3( 0, 0, -1 ).applyMatrix4( camera.matrixWorld ).sub( camera.position ).normalize();
+
+                    var targetNewPos = camera.position.clone();
+
+                    // TODO controls.getObject().position starts out as (0,10,0). Compensate.
+                    targetNewPos.add(controls.getObject().position);
+                    cameraDir.multiplyScalar(factor);
+                    targetNewPos.add(cameraDir);
                     cameraTargetIndicator.position.set(
-                        camera.position.x + cameraDir.x * factor,
-                        camera.position.y + cameraDir.y * factor,
-                        camera.position.z + cameraDir.z * factor);
+                        targetNewPos.x, targetNewPos.y, targetNewPos.z);
                 })();
 
                 //renderer.render( scene, camera );
