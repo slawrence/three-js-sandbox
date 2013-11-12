@@ -60,7 +60,6 @@
 
         (function() {
             var camera, scene, renderer;
-            var geometry, material, mesh;
             var controls, time = Date.now();
 
             var effect; // rift effect
@@ -68,6 +67,8 @@
             var objects = [];
 
             var ray;
+
+            var cameraTargetIndicator;
 
             if (!vr.isInstalled()) {
                 //statusEl.innerText = 'NPVR plugin not installed!';
@@ -112,16 +113,18 @@
                 ray = new THREE.Raycaster();
                 ray.ray.direction.set( 0, -1, 0 );
 
-                // floor
-                var floorTexture = new THREE.ImageUtils.loadTexture( 'images/checkerboard.jpg' );
-                floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; 
-                floorTexture.repeat.set( 10, 10 );
-                var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.DoubleSide } );
-                var floorGeometry = new THREE.PlaneGeometry(1000, 1000, 10, 10);
-                var floor = new THREE.Mesh(floorGeometry, floorMaterial);
-                floor.position.y = -0.5;
-                floor.rotation.x = Math.PI / 2;
-                scene.add(floor);
+                (function() {
+                    // floor
+                    var floorTexture = new THREE.ImageUtils.loadTexture( 'images/checkerboard.jpg' );
+                    floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; 
+                    floorTexture.repeat.set( 10, 10 );
+                    var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+                    var floorGeometry = new THREE.PlaneGeometry(1000, 1000, 10, 10);
+                    var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+                    floor.position.y = -0.5;
+                    floor.rotation.x = Math.PI / 2;
+                    scene.add(floor);
+                })();
 
                 (function() {
                     // SKYBOX/FOG
@@ -177,6 +180,14 @@
                     camera.position.set(0,0,300);
                 })();
 
+                cameraTargetIndicator = (function() {
+                    var geometry = new THREE.CubeGeometry(5,5,5);
+                    var material = new THREE.MeshBasicMaterial( { color: 0x0000ff } );
+                    var cube = new THREE.Mesh( geometry, material );
+                    scene.add(cube);
+                    return cube;
+                })(); // end of defining updateCameraTargetIndicator
+
                 renderer = new THREE.WebGLRenderer({
                     devicePixelRatio: 1,
                     alpha: false,
@@ -189,7 +200,7 @@
                 document.body.appendChild( renderer.domElement );
 
                 document.addEventListener( 'keydown', keyPressed, false );
-            }
+            } // end of function init(logoMesh)
 
             function keyPressed (event) {
                 switch ( event.keyCode ) {
@@ -225,6 +236,7 @@
             var vrstate = new vr.State();
             var vx = 1;
             function animate() {
+                debugger;
                 vr.requestAnimationFrame(animate);
                 var logoX = globalLogo.position.x;
                 if (logoX > 300) {
@@ -266,6 +278,18 @@
                     if ( webcamTexture ) 
                         webcamTexture.needsUpdate = true;
                 }
+
+                // update camera target indicator
+                (function() {
+                    var factor = 100;
+                    // src for this calc: http://stackoverflow.com/questions/14813902/three-js-get-the-direction-in-which-the-camera-is-looking
+                    var cameraDir = new THREE.Vector3( 0, 0, -1 ).applyQuaternion( camera.quaternion ).normalize();
+                    // var cameraDir = new THREE.Vector3( 0, 0, -1 ).applyMatrix4( camera.matrixWorld ).sub( camera.position ).normalize();
+                    cameraTargetIndicator.position.set(
+                        camera.position.x + cameraDir.x * factor,
+                        camera.position.y + cameraDir.y * factor,
+                        camera.position.z + cameraDir.z * factor);
+                })();
 
                 //renderer.render( scene, camera );
                 effect.render( scene, camera, polled ? vrstate : null );
